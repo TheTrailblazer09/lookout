@@ -110,6 +110,7 @@ def to_frames(feed: list[dict]) -> tuple[pd.DataFrame, pd.DataFrame]:
                 # cluster by title shape: syndicated copies share a headline
                 "cluster_id": hashlib.sha1(title.lower().encode()).hexdigest()[:16],
             }
+        av_topics = [t.get("topic", "") for t in item.get("topics", [])]
         for ts in item.get("ticker_sentiment", []):
             sym = ts.get("ticker")
             if not sym:
@@ -120,6 +121,8 @@ def to_frames(feed: list[dict]) -> tuple[pd.DataFrame, pd.DataFrame]:
                     "entity_score": float(ts.get("relevance_score", 0)),
                     "vendor_sentiment": float(ts.get("ticker_sentiment_score", 0)),
                     "title": title,
+                    "summary": (item.get("summary") or "").strip(),
+                    "vendor_topics": av_topics,
                     "known_at": when,
                 })
             except (TypeError, ValueError):

@@ -30,6 +30,7 @@ import numpy as np
 import pandas as pd
 
 from app.models import event as event_model
+from app.services.bots import topics as topic_rules
 from app.models.base import execute, insert_df, query
 from config import get_config
 
@@ -134,11 +135,13 @@ def score(articles: pd.DataFrame, mentions: pd.DataFrame,
 
             sent = local[r.Index] if local else float(r.vendor_sentiment)
             ent = float(r.entity_score)
+            topic, topic_conf = topic_rules.classify(
+                r.title, getattr(r, "summary", ""), getattr(r, "vendor_topics", None))
             # transparent blend; the trained model replaces exactly this line
             relevance = float(np.clip(0.55 * ent + 0.25 * nov + 0.20 * min(abs(sent) * 2, 1), 0, 1))
             rows.append({
                 "article_id": r.article_id, "ticker": ticker,
-                "entity_score": ent, "topic": "company", "topic_conf": 0.0,
+                "entity_score": ent, "topic": topic, "topic_conf": topic_conf,
                 "novelty": nov, "sentiment": sent, "relevance": relevance,
                 "model_version": model_version,
             })
@@ -209,20 +212,25 @@ def detect(as_of: str, lookback_days: int = 30) -> pd.DataFrame:
             if pd.isna(zz) or abs(zz) < MOOD_Z or row.date < window_start:
                 continue
             day = row.date.date()
-            best = query(f"""SELECT max(relevance) AS r FROM news_scores s
-                             JOIN news_articles a ON a.id = s.article_id
-                             WHERE s.ticker = '{ticker}'
-                               AND CAST(a.known_at AS DATE) = DATE '{day}'""")["r"][0]
-            if best is None or float(best) < MIN_RELEVANCE:
+            top = query(f"""SELECT s.relevance, s.topic FROM news_scores s
+                            JOIN news_articles a ON a.id = s.article_id
+                            WHERE s.ticker = '{ticker}'
+                              AND CAST(a.known_at AS DATE) = DATE '{day}'
+                            ORDER BY s.relevance DESC LIMIT 1""")
+            if top.empty or float(top["relevance"].iloc[0]) < MIN_RELEVANCE:
                 continue  # a mood swing with no substantial story behind it
+            topic = str(top["topic"].iloc[0])
             direction = "positive" if zz > 0 else "negative"
             rows.append({
                 "id": f"news-{ticker}-{day}",
-                "ticker": ticker, "type": "news", "subtype": direction[:3],
+                # subtype IS the topic: the fingerprint then measures this
+                # stock's reaction to layoffs separately from product news
+                "ticker": ticker, "type": "news", "subtype": topic,
                 "known_at": pd.Timestamp(day) + pd.Timedelta(hours=9),
                 "day0": day, "value": float(row.mood), "surprise_z": float(zz),
                 "source": "news-bot",
-                "description": (f"{ticker}: unusually {direction} coverage "
+                "description": (f"{ticker}: unusually {direction} coverage about "
+                                f"{topic_rules.label(topic)} "
                                 f"({row.headline_count} stories, "
                                 f"{abs(zz):.1f}x its normal mood swing)"),
             })

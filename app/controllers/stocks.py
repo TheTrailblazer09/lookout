@@ -5,6 +5,8 @@ from flask import Blueprint, jsonify, request
 from app.models import evidence as evidence_model
 from app.models import fingerprint as fingerprint_model
 from app.models import price as price_model
+from app.models.base import query
+from app.services.bots import topics as topic_rules
 from app.utils.errors import ApiError
 from config import get_config
 
@@ -84,3 +86,55 @@ def fingerprint_history(ticker):
     return jsonify(ticker=ticker.upper(), event_type=event_type,
                    snapshots=_clean(df, ["as_of", "n", "shrunk_move_pct",
                                          "ci_low_pct", "ci_high_pct", "reliable"]))
+
+
+@bp.get("/<ticker>/news")
+def news(ticker):
+    """Recent articles, most relevant first, each with its topic."""
+    as_of = request.args.get("as_of") or cfg.default_as_of()
+    min_rel = float(request.args.get("min_relevance", 0.4))
+    topic = request.args.get("topic")
+    extra = f" AND s.topic = '{topic}'" if topic else ""
+    df = query(f"""
+        SELECT a.known_at, a.title, a.url, a.source, s.topic,
+               round(s.relevance, 2) AS relevance,
+               round(s.sentiment, 2) AS sentiment,
+               round(s.novelty, 2) AS novelty
+        FROM news_scores s JOIN news_articles a ON a.id = s.article_id
+        WHERE s.ticker = '{ticker.upper()}'
+          AND a.known_at <= TIMESTAMP '{as_of} 23:59:59'
+          AND s.relevance >= {min_rel}{extra}
+        ORDER BY a.known_at DESC LIMIT {int(request.args.get('limit', 25))}
+    """)
+    if df.empty:
+        return jsonify(ticker=ticker.upper(), as_of=as_of, articles=[])
+    df = df.copy()
+    df["known_at"] = df["known_at"].astype(str)
+    df["topic_label"] = df["topic"].map(topic_rules.label)
+    return jsonify(ticker=ticker.upper(), as_of=as_of, articles=_clean(df))
+
+
+@bp.get("/<ticker>/news/topics")
+def news_topics(ticker):
+    """What kinds of news this stock gets, and how it reacts to each."""
+    as_of = request.args.get("as_of") or cfg.default_as_of()
+    counts = query(f"""
+        SELECT s.topic, count(*) AS articles, round(avg(s.sentiment), 2) AS avg_sentiment
+        FROM news_scores s JOIN news_articles a ON a.id = s.article_id
+        WHERE s.ticker = '{ticker.upper()}'
+          AND a.known_at <= TIMESTAMP '{as_of} 23:59:59'
+        GROUP BY 1 ORDER BY articles DESC
+    """)
+    moves = query(f"""
+        SELECT subtype AS topic, count(*) AS events,
+               round(avg(abs(abnormal_ret)) * 100, 2) AS typical_move_pct
+        FROM evidence
+        WHERE ticker = '{ticker.upper()}' AND event_type = 'news' AND included
+          AND outcome_known_at <= TIMESTAMP '{as_of} 23:59:59'
+        GROUP BY 1
+    """)
+    if counts.empty:
+        return jsonify(ticker=ticker.upper(), as_of=as_of, topics=[])
+    merged = counts.merge(moves, on="topic", how="left")
+    merged["label"] = merged["topic"].map(topic_rules.label)
+    return jsonify(ticker=ticker.upper(), as_of=as_of, topics=_clean(merged))
