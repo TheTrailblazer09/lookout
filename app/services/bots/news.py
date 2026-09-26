@@ -24,6 +24,7 @@ article is behind it.
 from __future__ import annotations
 
 import re
+from collections import deque
 
 import numpy as np
 import pandas as pd
@@ -43,32 +44,56 @@ def _tokens(title: str) -> set[str]:
     return set(_WORD.findall((title or "").lower()))
 
 
-def _novelty(title: str, prior_titles: list[str]) -> float:
-    """1.0 = nothing like it recently; 0.0 = a duplicate."""
-    t = _tokens(title)
-    if not t or not prior_titles:
+# How many recent headlines a new one is compared against. The 72-hour
+# window is the rule; this cap keeps a busy ticker from turning the scan
+# quadratic (21,000 mentions compared pairwise is ~200 million string ops).
+MAX_COMPARISONS = 120
+
+
+def _novelty_tokens(tokens: set[str], prior: deque) -> float:
+    """1.0 = nothing like it recently; 0.0 = a duplicate.
+
+    `prior` holds (timestamp, token-set) pairs already trimmed to the
+    window, so tokenizing happens once per article rather than once per
+    comparison.
+    """
+    if not tokens or not prior:
         return 1.0
     best = 0.0
-    for other in prior_titles:
-        o = _tokens(other)
-        if not o:
+    for _, other in list(prior)[-MAX_COMPARISONS:]:
+        if not other:
             continue
-        overlap = len(t & o) / len(t | o)      # Jaccard
-        best = max(best, overlap)
+        overlap = len(tokens & other) / len(tokens | other)   # Jaccard
+        if overlap > best:
+            best = overlap
+            if best >= 0.99:      # an exact duplicate: nothing can beat it
+                break
     return float(1.0 - best)
+
+
+def _novelty(title: str, prior_titles: list[str]) -> float:
+    """Convenience wrapper kept for direct use and tests."""
+    return _novelty_tokens(_tokens(title),
+                           deque((None, _tokens(p)) for p in prior_titles))
 
 
 def _finbert_scores(titles: list[str]):
     """Local sentiment if transformers is installed; None otherwise."""
     try:
+        import torch  # noqa: F401  - transformers needs a working backend
         from transformers import pipeline
-    except ImportError:
+    except ImportError as exc:
+        print(f"  ! local sentiment unavailable ({exc}); using vendor scores. "
+              "To enable: pip install -U 'torch>=2.5' transformers")
         return None
     try:
         clf = pipeline("sentiment-analysis", model=cfg.FINBERT_MODEL, truncation=True)
-    except Exception as exc:  # noqa: BLE001 - model not downloaded, no torch, etc.
-        print(f"  ! FinBERT unavailable ({exc}); using vendor sentiment")
+    except Exception as exc:  # noqa: BLE001 - model not downloaded, wrong torch, etc.
+        print(f"  ! local sentiment unavailable ({exc}); using vendor scores. "
+              "To enable: pip install -U 'torch>=2.5' transformers")
         return None
+    print(f"  scoring sentiment locally with {cfg.FINBERT_MODEL} "
+          f"({len(titles):,} headlines, this takes a few minutes)")
     out = []
     for i in range(0, len(titles), 32):
         for r in clf(titles[i:i + 32]):
@@ -79,7 +104,7 @@ def _finbert_scores(titles: list[str]):
 
 
 def score(articles: pd.DataFrame, mentions: pd.DataFrame,
-          use_finbert: bool = True) -> pd.DataFrame:
+          use_finbert: bool = True, progress=None) -> pd.DataFrame:
     """Turn raw articles + mentions into news_scores rows."""
     if mentions.empty:
         return pd.DataFrame()
@@ -89,16 +114,23 @@ def score(articles: pd.DataFrame, mentions: pd.DataFrame,
     local = _finbert_scores(m["title"].tolist()) if use_finbert else None
     model_version = MODEL_VERSION_RULE + ("+finbert" if local else "+vendor")
 
+    window = pd.Timedelta(hours=72)
     rows = []
+    done = 0
     for ticker, chunk in m.groupby("ticker"):
         chunk = chunk.sort_values("known_at")
-        titles, times = [], []
-        for pos, r in enumerate(chunk.itertuples()):
-            cutoff = r.known_at - pd.Timedelta(hours=72)
-            prior = [ti for ti, tm in zip(titles, times) if tm >= cutoff]
-            nov = _novelty(r.title, prior)
-            titles.append(r.title)
-            times.append(r.known_at)
+        prior: deque = deque()          # (timestamp, tokens) inside the window
+        for r in chunk.itertuples():
+            cutoff = r.known_at - window
+            while prior and prior[0][0] < cutoff:
+                prior.popleft()         # drop what is older than 72 hours
+            tokens = _tokens(r.title)
+            nov = _novelty_tokens(tokens, prior)
+            prior.append((r.known_at, tokens))
+
+            done += 1
+            if progress and done % 2000 == 0:
+                progress(done, len(m))
 
             sent = local[r.Index] if local else float(r.vendor_sentiment)
             ent = float(r.entity_score)
