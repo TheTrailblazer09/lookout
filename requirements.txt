@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+duckdb
+pandas
+numpy
+scikit-learn
+yfinance
+Werkzeug
+flask
+flask-cors
+PyJWT

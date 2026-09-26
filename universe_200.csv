@@ -1,0 +1,200 @@
+ticker,sector,sector_etf
+AAPL,Information Technology,XLK
+MSFT,Information Technology,XLK
+NVDA,Information Technology,XLK
+AVGO,Information Technology,XLK
+ORCL,Information Technology,XLK
+CRM,Information Technology,XLK
+AMD,Information Technology,XLK
+ADBE,Information Technology,XLK
+CSCO,Information Technology,XLK
+ACN,Information Technology,XLK
+IBM,Information Technology,XLK
+QCOM,Information Technology,XLK
+TXN,Information Technology,XLK
+INTU,Information Technology,XLK
+AMAT,Information Technology,XLK
+MU,Information Technology,XLK
+PANW,Information Technology,XLK
+NOW,Information Technology,XLK
+ADI,Information Technology,XLK
+LRCX,Information Technology,XLK
+KLAC,Information Technology,XLK
+SNPS,Information Technology,XLK
+CDNS,Information Technology,XLK
+CRWD,Information Technology,XLK
+PLTR,Information Technology,XLK
+JPM,Financials,XLF
+BAC,Financials,XLF
+WFC,Financials,XLF
+C,Financials,XLF
+GS,Financials,XLF
+MS,Financials,XLF
+SCHW,Financials,XLF
+BLK,Financials,XLF
+SPGI,Financials,XLF
+CME,Financials,XLF
+ICE,Financials,XLF
+AXP,Financials,XLF
+COF,Financials,XLF
+USB,Financials,XLF
+PNC,Financials,XLF
+BNY,Financials,XLF
+STT,Financials,XLF
+TROW,Financials,XLF
+CB,Financials,XLF
+MRSH,Financials,XLF
+AON,Financials,XLF
+MET,Financials,XLF
+PRU,Financials,XLF
+ALL,Financials,XLF
+LLY,Health Care,XLV
+UNH,Health Care,XLV
+JNJ,Health Care,XLV
+ABBV,Health Care,XLV
+MRK,Health Care,XLV
+TMO,Health Care,XLV
+ABT,Health Care,XLV
+ISRG,Health Care,XLV
+AMGN,Health Care,XLV
+GILD,Health Care,XLV
+SYK,Health Care,XLV
+BSX,Health Care,XLV
+MDT,Health Care,XLV
+BMY,Health Care,XLV
+CVS,Health Care,XLV
+CI,Health Care,XLV
+ELV,Health Care,XLV
+ZTS,Health Care,XLV
+REGN,Health Care,XLV
+VRTX,Health Care,XLV
+MCK,Health Care,XLV
+COR,Health Care,XLV
+HCA,Health Care,XLV
+DHR,Health Care,XLV
+AMZN,Consumer Discretionary,XLY
+TSLA,Consumer Discretionary,XLY
+HD,Consumer Discretionary,XLY
+MCD,Consumer Discretionary,XLY
+LOW,Consumer Discretionary,XLY
+BKNG,Consumer Discretionary,XLY
+TJX,Consumer Discretionary,XLY
+NKE,Consumer Discretionary,XLY
+SBUX,Consumer Discretionary,XLY
+ORLY,Consumer Discretionary,XLY
+AZO,Consumer Discretionary,XLY
+ROST,Consumer Discretionary,XLY
+MAR,Consumer Discretionary,XLY
+GM,Consumer Discretionary,XLY
+F,Consumer Discretionary,XLY
+CMG,Consumer Discretionary,XLY
+DHI,Consumer Discretionary,XLY
+LEN,Consumer Discretionary,XLY
+EBAY,Consumer Discretionary,XLY
+RCL,Consumer Discretionary,XLY
+GE,Industrials,XLI
+RTX,Industrials,XLI
+CAT,Industrials,XLI
+BA,Industrials,XLI
+HON,Industrials,XLI
+UNP,Industrials,XLI
+ETN,Industrials,XLI
+DE,Industrials,XLI
+LMT,Industrials,XLI
+UPS,Industrials,XLI
+PH,Industrials,XLI
+WM,Industrials,XLI
+MMM,Industrials,XLI
+GD,Industrials,XLI
+NOC,Industrials,XLI
+TDG,Industrials,XLI
+ITW,Industrials,XLI
+EMR,Industrials,XLI
+CSX,Industrials,XLI
+NSC,Industrials,XLI
+PWR,Industrials,XLI
+CARR,Industrials,XLI
+JCI,Industrials,XLI
+FAST,Industrials,XLI
+GOOGL,Communication Services,XLC
+META,Communication Services,XLC
+NFLX,Communication Services,XLC
+TMUS,Communication Services,XLC
+DIS,Communication Services,XLC
+T,Communication Services,XLC
+VZ,Communication Services,XLC
+CMCSA,Communication Services,XLC
+CHTR,Communication Services,XLC
+EA,Communication Services,XLC
+WBD,Communication Services,XLC
+FOXA,Communication Services,XLC
+NWSA,Communication Services,XLC
+OMC,Communication Services,XLC
+LYV,Communication Services,XLC
+WMT,Consumer Staples,XLP
+COST,Consumer Staples,XLP
+PG,Consumer Staples,XLP
+KO,Consumer Staples,XLP
+PEP,Consumer Staples,XLP
+PM,Consumer Staples,XLP
+MO,Consumer Staples,XLP
+MDLZ,Consumer Staples,XLP
+CL,Consumer Staples,XLP
+KMB,Consumer Staples,XLP
+GIS,Consumer Staples,XLP
+KHC,Consumer Staples,XLP
+SYY,Consumer Staples,XLP
+KR,Consumer Staples,XLP
+ADM,Consumer Staples,XLP
+XOM,Energy,XLE
+CVX,Energy,XLE
+COP,Energy,XLE
+EOG,Energy,XLE
+SLB,Energy,XLE
+MPC,Energy,XLE
+PSX,Energy,XLE
+VLO,Energy,XLE
+OXY,Energy,XLE
+WMB,Energy,XLE
+KMI,Energy,XLE
+HAL,Energy,XLE
+FANG,Energy,XLE
+DVN,Energy,XLE
+NEE,Utilities,XLU
+SO,Utilities,XLU
+DUK,Utilities,XLU
+CEG,Utilities,XLU
+VST,Utilities,XLU
+AEP,Utilities,XLU
+SRE,Utilities,XLU
+EXC,Utilities,XLU
+XEL,Utilities,XLU
+ED,Utilities,XLU
+PEG,Utilities,XLU
+D,Utilities,XLU
+PLD,Real Estate,XLRE
+AMT,Real Estate,XLRE
+EQIX,Real Estate,XLRE
+WELL,Real Estate,XLRE
+SPG,Real Estate,XLRE
+O,Real Estate,XLRE
+PSA,Real Estate,XLRE
+CCI,Real Estate,XLRE
+DLR,Real Estate,XLRE
+VICI,Real Estate,XLRE
+CBRE,Real Estate,XLRE
+AVB,Real Estate,XLRE
+EQR,Real Estate,XLRE
+LIN,Materials,XLB
+SHW,Materials,XLB
+APD,Materials,XLB
+ECL,Materials,XLB
+FCX,Materials,XLB
+NEM,Materials,XLB
+NUE,Materials,XLB
+MLM,Materials,XLB
+VMC,Materials,XLB
+DOW,Materials,XLB
+DD,Materials,XLB
+STLD,Materials,XLB
+CF,Materials,XLB
