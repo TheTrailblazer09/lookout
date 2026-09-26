@@ -1,1 +1,11 @@
 data/*.duckdb
+data/
+cli/__pycache__/*
+app/models/__pycache__/*
+app/services/__pycache__/*
+app/services/bots/__pycache__/*
+app/services/sources/__pycache__/*
+app/controllers/__pycache__/*
+app/__pycache__/*
+cli/__pycache__
+

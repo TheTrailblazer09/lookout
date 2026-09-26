@@ -9,3 +9,5 @@ Werkzeug
 flask
 flask-cors
 PyJWT
+transformers
+torch>=2.5

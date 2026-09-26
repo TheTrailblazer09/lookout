@@ -56,7 +56,23 @@ def detect_command(as_of, days, news_fetch, news_tickers, no_finbert):
             articles, mentions = news_source.to_frames(feed)
             click.echo(f"  {len(articles)} articles, {len(mentions)} ticker mentions")
             if not articles.empty:
-                scores = news_bot.score(articles, mentions, use_finbert=not no_finbert)
+                # Alpha Vantage returns every ticker mentioned in an article,
+                # including ones we do not hold; those add tens of thousands of
+                # rows and nothing to the demo.
+                if not mentions.empty:
+                    mentions = mentions[mentions["ticker"].isin(tickers)]
+                    keep = set(mentions["article_id"])
+                    articles = articles[articles["id"].isin(keep)]
+                    click.echo(f"  kept {len(articles)} articles mentioning your "
+                               f"tickers ({len(mentions)} mentions)")
+
+                def _score_tick(done, total):
+                    click.echo(f"\r  scoring {done:,}/{total:,}", nl=False)
+
+                scores = news_bot.score(articles, mentions,
+                                        use_finbert=not no_finbert,
+                                        progress=_score_tick)
+                click.echo("")
                 stored = news_bot.store(articles, scores)
                 click.echo(f"  stored {stored['articles']} articles, "
                            f"{stored['scores']} scores, {stored['mood_days']} mood-days")
