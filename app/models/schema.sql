@@ -166,3 +166,12 @@ CREATE TABLE IF NOT EXISTS summaries (
   payload      TEXT,
   created_at   TIMESTAMP
 );
+
+
+CREATE TABLE IF NOT EXISTS indicators (
+  series_id  TEXT,
+  label      TEXT,
+  date       DATE,
+  known_at   TIMESTAMP,
+  value      DOUBLE
+);

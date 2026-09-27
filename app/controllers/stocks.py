@@ -6,6 +6,8 @@ from app.models import evidence as evidence_model
 from app.models import fingerprint as fingerprint_model
 from app.models import price as price_model
 from app.models.base import query
+from app.services import auth as auth_service
+from app.services import stock_detail
 from app.services.bots import topics as topic_rules
 from app.utils.errors import ApiError
 from config import get_config
@@ -20,6 +22,18 @@ def _clean(df, cols=None):
         return []
     out = df[cols] if cols else df
     return out.replace({np.nan: None}).to_dict("records")
+
+
+@bp.get("/<ticker>/detail")
+@auth_service.optional_auth
+def detail(ticker):
+    """Everything the holdings page needs about one stock, in one call."""
+    as_of = request.args.get("as_of") or cfg.default_as_of()
+    days = int(request.args.get("days", 260))
+    data = stock_detail.build(auth_service.portfolio_id(), ticker, as_of, days)
+    if data.get("empty"):
+        raise ApiError(f"No price history for {ticker.upper()}", 404)
+    return jsonify(data)
 
 
 @bp.get("/<ticker>/prices")

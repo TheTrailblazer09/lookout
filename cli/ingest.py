@@ -17,6 +17,7 @@ import pandas as pd
 from flask.cli import with_appcontext
 
 from app.models import event as event_model
+from app.models import indicator as indicator_model
 from app.models.base import insert_df, query, truncate
 from app.services.sources import macro as macro_source
 from app.services.sources import market as market_source
@@ -88,8 +89,17 @@ def ingest_command(start, end, tickers, skip_prices, skip_earnings, skip_macro):
         else:
             click.echo("macro: FRED releases (using first-publication dates)")
             inds = macro_source.fetch_indicators(cfg.FRED_KEY, start)
+            rows = []
             for sid, df in inds.items():
                 click.echo(f"  {sid:<12} {len(df):>5} observations")
+                label = macro_source.SERIES[sid][1]
+                for r in df.itertuples():
+                    rows.append({"series_id": sid, "label": label, "date": r.date,
+                                 "known_at": r.published, "value": float(r.value)})
+            if rows:
+                import pandas as pd
+                n = indicator_model.replace(pd.DataFrame(rows))
+                click.echo(f"  stored {n:,} indicator readings")
             ev = macro_source.to_events(inds, sessions)
             n = event_model.upsert(ev)
             click.echo(f"  {n:,} macro events")

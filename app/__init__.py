@@ -33,8 +33,8 @@ def create_app(env: str | None = None) -> Flask:
 
 
 def _register_blueprints(app: Flask) -> None:
-    from app.controllers import (alerts, auth, insights, llm, overview, plan,
-                                 portfolio, preferences, stocks)
+    from app.controllers import (alerts, auth, insights, language_model, overview, plan,
+                                 portfolio, preferences, stocks, weather)
     for module in (auth, portfolio, preferences, overview, stocks,
-                   insights, alerts, plan, llm):
+                   insights, alerts, plan, weather, language_model):
         app.register_blueprint(module.bp)

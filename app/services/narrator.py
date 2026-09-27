@@ -144,8 +144,7 @@ def template(facts: dict) -> dict:
         history = (f"Across {facts['n_past']} similar past events, {t} moved about "
                    f"{facts['typical_move_pct']}% over the following days, against "
                    f"{facts['baseline_move_pct']}% in an ordinary stretch — so this "
-                   f"kind of event {'has moved it more than usual' if louder else
-                                    'has not moved it unusually much'}.")
+                   f"kind of event {'has moved it more than usual' if louder else 'has not moved it unusually much'}.")
     else:
         history = (f"Lookout has not recorded a comparable event for {t} yet, so "
                    "there is no track record to compare this with. That fills in "
@@ -209,6 +208,30 @@ def installed(model: str) -> bool:
         return False
     want = model if ":" in model else f"{model}:latest"
     return any(n == want or n.split(":")[0] == want.split(":")[0] for n in names)
+
+
+def write(facts: dict, prompt: str, keys: tuple[str, ...],
+          model: str | None = None) -> tuple[dict | None, str]:
+    """Ask the model for a JSON object with `keys`, using the named prompt
+    file, and reject it if any number in it was not in `facts`.
+
+    The same loop as alerts: this is the one place that decides what
+    counts as acceptable model output.
+    """
+    model = model or cfg.LLM_DEEP
+    if not installed(model):
+        model = cfg.LLM_FAST
+    instructions = load_prompt(prompt)
+    for _ in range(MAX_ATTEMPTS):
+        try:
+            out = _ask(model, facts, cfg.LLM_TIMEOUT, prompt=instructions)
+        except Exception:  # noqa: BLE001
+            return None, "unavailable"
+        text = " ".join(str(out.get(k, "")) for k in keys)
+        ok, _bad = grounded(text, facts)
+        if ok and out.get(keys[-1]):
+            return {k: out.get(k, "") for k in keys}, "llm"
+    return None, "ungrounded"
 
 
 def portfolio_read(facts: dict, model: str | None = None) -> tuple[dict | None, str]:
