@@ -1,0 +1,124 @@
+/* ==========================================================================
+   Nautical scene — replaces the old div-stacked lighthouse.
+   Loaded after styles.css, so these rules win.
+   ========================================================================== */
+
+/* Neutralise every positioned piece of the old scene. */
+.lighthouse-scene .tower,
+.lighthouse-scene .roof,
+.lighthouse-scene .lamp,
+.lighthouse-scene .beam,
+.lighthouse-scene .body,
+.lighthouse-scene .boat,
+.lighthouse-scene .wave {
+  display: none !important;
+}
+.lighthouse-scene::before,
+.lighthouse-scene::after {
+  content: none !important;
+}
+
+.lighthouse-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.scene-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.scene-stars circle { fill: #F3EEE3; opacity: 0.55; }
+
+/* Where the lighthouse stands. Changing this one line moves the tower,
+   its rock and the beam together. */
+.scene-light { transform: translate(430px, 22px); }
+
+/* A real lighthouse lamp turns continuously, so the beam goes all the way
+   round: out to the right, toward the viewer, away to the left, and back.
+   The turn is linear because a rotating lamp has no reason to ease.
+   transform-origin sits on the lamp in user units, not fill-box, so the
+   pivot does not shift when the cone is clipped. */
+.scene-beam {
+  transform-origin: 300px 616px;
+  animation: lk-turn 16s linear infinite;
+  will-change: transform;
+}
+@keyframes lk-turn {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* the lamp brightens as the beam passes the viewer */
+.scene-lamp-glow { animation: lk-pulse 16s linear infinite; transform-origin: 300px 616px; }
+.scene-lamp { animation: lk-lamp 16s linear infinite; }
+@keyframes lk-pulse {
+  0%, 100%  { opacity: 1;    transform: scale(1.1); }   /* facing us */
+  25%, 75%  { opacity: 0.7;  transform: scale(1); }
+  50%       { opacity: 0.45; transform: scale(0.9); }   /* facing away */
+}
+@keyframes lk-lamp {
+  0%, 100% { fill: #FFE9B0; }
+  50%      { fill: #C9902E; }
+}
+
+/* --- the boat: drift across on one timer, bob on another, so the two
+       never line up and the motion stays irregular --- */
+.scene-boat {
+  animation: lk-drift 46s linear infinite;
+  will-change: transform;
+}
+.scene-boat-bob {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: lk-bob 4.6s ease-in-out infinite;
+}
+@keyframes lk-drift {
+  from { transform: translate(-120px, 832px); }
+  to   { transform: translate(1520px, 832px); }
+}
+@keyframes lk-bob {
+  0%, 100% { transform: translateY(0) rotate(-3.5deg); }
+  50%      { transform: translateY(-7px) rotate(3.5deg); }
+}
+
+/* --- water: two copies per band, shifted by exactly one copy width, so
+       the reset is invisible. Nearer bands move faster (parallax). --- */
+.scene-wave { will-change: transform; }
+.wave-back  { animation: lk-scroll 26s linear infinite; }
+.wave-mid   { animation: lk-scroll 18s linear infinite; }
+.wave-front { animation: lk-scroll 12s linear infinite; }
+@keyframes lk-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-1440px); }
+}
+
+/* Onboarding uses the same scene in a narrow column. */
+.scene-onboard .scene-svg { object-fit: cover; }
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-beam, .scene-boat, .scene-boat-bob,
+  .scene-wave, .scene-lamp, .scene-lamp-glow {
+    animation: none !important;
+  }
+  .scene-boat { transform: translate(680px, 832px); }
+  .scene-beam { transform: rotate(-8deg); }
+}
+
+/* Onboarding shows the scene as a band at the foot of the left column.
+   Cropping to the lower-left keeps the lighthouse in frame at that
+   aspect ratio instead of centring on empty sky. */
+.onboard-side .lighthouse-scene {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 300px;
+}
+.onboard-side .scene-svg {
+  height: 100%;
+  object-fit: cover;
+}

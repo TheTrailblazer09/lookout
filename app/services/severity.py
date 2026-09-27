@@ -47,7 +47,7 @@ def _severity(impact: float, day_move: float) -> str:
 
 
 def _sources(ticker: str, as_of: str, limit: int = 3) -> list[dict]:
-    df = query(f"""SELECT a.title, a.url, a.source, round(s.relevance, 2) AS relevance
+    df = query(f"""SELECT a.title, a.summary, a.url, a.source, round(s.relevance, 2) AS relevance
                    FROM news_scores s JOIN news_articles a ON a.id = s.article_id
                    WHERE s.ticker = '{ticker}'
                      AND CAST(a.known_at AS DATE) = DATE '{as_of}'

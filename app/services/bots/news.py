@@ -112,7 +112,11 @@ def score(articles: pd.DataFrame, mentions: pd.DataFrame,
 
     m = mentions.sort_values("known_at").reset_index(drop=True)
 
-    local = _finbert_scores(m["title"].tolist()) if use_finbert else None
+    # Headlines are written to be clicked, not to be accurate: "Apple in
+    # focus as tech slides" is about the sector, not the company. The
+    # summary says what the story actually is, so both feed the scorer.
+    texts = (m["title"].fillna("") + ". " + m.get("summary", "").fillna("")).str.slice(0, 600)
+    local = _finbert_scores(texts.tolist()) if use_finbert else None
     model_version = MODEL_VERSION_RULE + ("+finbert" if local else "+vendor")
 
     window = pd.Timedelta(hours=72)
@@ -125,6 +129,9 @@ def score(articles: pd.DataFrame, mentions: pd.DataFrame,
             cutoff = r.known_at - window
             while prior and prior[0][0] < cutoff:
                 prior.popleft()         # drop what is older than 72 hours
+            # novelty still keys on the headline: two outlets rewriting the
+            # same story keep similar titles, and summaries diverge enough
+            # to hide the duplication
             tokens = _tokens(r.title)
             nov = _novelty_tokens(tokens, prior)
             prior.append((r.known_at, tokens))

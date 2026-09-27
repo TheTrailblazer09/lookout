@@ -178,7 +178,7 @@ def _evidence(ticker: str, as_of: str, limit: int = 12) -> list[dict]:
 
 def _news(ticker: str, as_of: str, limit: int = 6) -> dict:
     articles = query(f"""
-        SELECT a.known_at, a.title, a.url, a.source, s.topic,
+        SELECT a.known_at, a.title, a.summary, a.url, a.source, s.topic,
                round(s.relevance, 2) AS relevance, round(s.sentiment, 2) AS sentiment
         FROM news_scores s JOIN {visible('news_articles', as_of)} a ON a.id = s.article_id
         WHERE s.ticker = '{ticker}'
@@ -196,8 +196,9 @@ def _news(ticker: str, as_of: str, limit: int = 6) -> dict:
     """)
     return {
         "articles": [] if articles.empty else [{
-            "date": str(r.known_at)[:10], "title": r.title, "url": r.url,
-            "source": r.source, "topic": r.topic,
+            "date": str(r.known_at)[:10], "title": r.title,
+            "summary": (r.summary or "")[:420],
+            "url": r.url, "source": r.source, "topic": r.topic,
             "topic_label": topic_rules.label(r.topic),
             "relevance": float(r.relevance), "sentiment": float(r.sentiment),
         } for r in articles.itertuples()],
