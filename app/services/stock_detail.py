@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from app.models import evidence as evidence_model
+from app.models import fundamental as fundamental_model
 from app.models import event as event_model
 from app.models import fingerprint as fingerprint_model
 from app.models import portfolio as portfolio_model
@@ -44,6 +45,7 @@ def build(portfolio_id: str, ticker: str, as_of: str, days: int = 260) -> dict:
         "series": _series(px, days),
         "pins": _pins(ticker, as_of, px.index[-days:] if len(px) > days else px.index),
         "technicals": _technicals(px, rets),
+        "fundamentals": _fundamentals(ticker, float(px.iloc[-1])),
         "risk": _risk(ticker, as_of),
         "fingerprint": _fingerprint(ticker, as_of),
         "evidence": _evidence(ticker, as_of),
@@ -210,3 +212,21 @@ def _news(ticker: str, as_of: str, limit: int = 6) -> dict:
             {"topic": r.topic, "label": topic_rules.label(r.topic), "n": int(r.n)}
             for r in topics.itertuples()],
     }
+
+def _fundamentals(ticker: str, price: float) -> dict | None:
+    """Company facts, plus two things worth deriving from today's price."""
+    data = fundamental_model.get(ticker)
+    if not data:
+        return None
+
+    out = dict(data)
+    # where the price sits in its 52-week range, as a percentage: more
+    # useful than two bare numbers
+    hi, lo = data.get("high_52w"), data.get("low_52w")
+    if hi and lo and hi > lo:
+        out["range_position_pct"] = round((price - lo) / (hi - lo) * 100, 0)
+    # how far today's price is from where analysts expect it
+    target = data.get("analyst_target")
+    if target:
+        out["vs_target_pct"] = round((target / price - 1) * 100, 1)
+    return out

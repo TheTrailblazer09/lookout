@@ -175,3 +175,12 @@ CREATE TABLE IF NOT EXISTS indicators (
   known_at   TIMESTAMP,
   value      DOUBLE
 );
+-- Company facts (size, valuation, margins, sector). One row per ticker,
+-- refreshed by `flask ingest`. known_at is when we fetched it: these are
+-- slow-moving figures, not a time series, so the replay treats them as
+-- "what we know about the company" rather than as-of-that-day data.
+CREATE TABLE IF NOT EXISTS fundamentals (
+  ticker    TEXT,
+  known_at  TIMESTAMP,
+  payload   TEXT
+);

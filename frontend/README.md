@@ -17,9 +17,9 @@ npm run dev
 | `/onboarding` | `OnboardingPage.jsx` | Add holdings |
 | `/overview` | `OverviewPage.jsx` | Overview |
 | `/signals` | `SignalsPage.jsx` | Signal log |
-| `/course` | `CoursePage.jsx` | Chart a course |
-| `/holdings` | `HoldingsPage.jsx` | One ship at a time |
-| `/weather` | `WeatherPage.jsx` | Weather report |
+| `/course` | `CoursePage.jsx` | Portfolio Recommendations |
+| `/holdings` | `HoldingsPage.jsx` | All Stock Holdings Fundamentals|
+| `/weather` | `WeatherPage.jsx` | Macro Economic Report |
 | `/drivers` | `DriversPage.jsx` | What moves my stocks |
 
 Shared shell/UI lives in `src/components/`. Demo portfolio data is in `src/data/portfolio.js` so you can swap it for API calls later.

@@ -1,23 +1,31 @@
 /**
- * The nautical scene, drawn as one SVG instead of stacked divs.
+ * The nautical scene, drawn as one SVG.
  *
- * Why SVG: the old version positioned a tower, boat and four waves with
- * vw/vh offsets, so every screen size pulled the picture apart. Here the
- * whole scene lives in one 1440x1000 viewBox and scales as a unit, which
- * is also what makes it match the design canvas exactly.
+ * The lighthouse sits low on the left, under the headline. Its geometry is
+ * written directly in viewBox coordinates rather than being nudged around
+ * with a CSS transform on the group: the beam pivots about the lamp, and
+ * CSS resolves transform-origin against the SVG viewport, so a translated
+ * parent would leave the pivot behind and the light would swing around the
+ * page instead of turning on the lamp.
  *
- * Three things move, all in CSS so they cost nothing:
- *   - the beam sweeps out from the lamp
+ * LAMP_X / LAMP_Y below are the single source of truth for where the light
+ * turns; scene.css uses the same two numbers.
+ *
+ * Three things move, all in CSS:
+ *   - the beam turns a full circle on the lamp
  *   - the boat rides the swell and drifts across
- *   - the water scrolls (each wave band is drawn twice, end to end, and
- *     shifted by exactly one copy, so the loop has no visible seam)
+ *   - the water scrolls (each band is drawn twice and shifted by exactly
+ *     one copy, so the loop has no seam)
  */
+const LAMP_X = 268;
+const LAMP_Y = 678;
+
 export function LighthouseScene({ variant = 'login' }) {
   return (
     <div className={`lighthouse-scene scene-${variant}`} aria-hidden="true">
       <svg
         className="scene-svg"
-        viewBox={variant === 'onboard' ? '520 560 900 440' : '0 0 1440 1000'}
+        viewBox={variant === 'onboard' ? '110 590 780 410' : '0 0 1440 1000'}
         preserveAspectRatio={variant === 'onboard' ? 'xMinYMax slice' : 'xMidYMax slice'}
         role="presentation"
       >
@@ -54,29 +62,29 @@ export function LighthouseScene({ variant = 'login' }) {
           <circle cx="60" cy="330" r="1.5" />
         </g>
 
-        {/* Beam and tower share one transform so the light always starts
-            exactly at the lamp, wherever the lighthouse is placed. The beam
-            is drawn FIRST so the tower hides it on the back half of the
-            turn, which is what sells the rotation. */}
-        <g className="scene-light">
-          <g className="scene-beam">
-            <polygon points="300,616 1900,146 1900,1086" fill="url(#lk-beam)" />
-            <polygon points="300,616 1900,360 1900,872" fill="url(#lk-beam)" opacity="0.55" />
-          </g>
-
-        {/* ---- lighthouse ---- */}
-        <g className="scene-tower">
-          <path d="M150 864 Q235 790 300 792 Q375 790 450 864 Z" fill="#0E1828" />
-          <path d="M268 818 L284 640 H316 L332 818 Z" fill="#F3EEE3" />
-          <path d="M278.5 730 L281 700 H319 L321.5 730 Z" fill="#E0561F" />
-          <path d="M273.4 792 L275.8 762 H324.2 L326.6 792 Z" fill="#E0561F" />
-          <rect x="274" y="632" width="52" height="10" rx="2" fill="#16243A" stroke="#F3EEE3" strokeWidth="3" />
-          <rect x="286" y="600" width="28" height="32" rx="3" fill="#16243A" />
-          <circle className="scene-lamp-glow" cx="300" cy="616" r="36" fill="url(#lk-glow)" />
-          <rect className="scene-lamp" x="290" y="606" width="20" height="20" rx="2" fill="#F2B33D" />
-          <path d="M280 602 L300 576 L320 602 Z" fill="#E0561F" />
-          <path d="M293 818 V800 a7 7 0 0 1 14 0 V818 Z" fill="#16243A" />
+        {/* One beam, pointing out to sea and tilting slowly up and down.
+            Its apex sits exactly on the lamp, so the tilt reads as the
+            light sweeping rather than the shape sliding. */}
+        <g className="scene-beam">
+          <polygon points={`${LAMP_X},${LAMP_Y} 2100,${LAMP_Y - 430} 2100,${LAMP_Y + 430}`} fill="url(#lk-beam)" />
+          <polygon points={`${LAMP_X},${LAMP_Y} 2100,${LAMP_Y - 200} 2100,${LAMP_Y + 200}`} fill="url(#lk-beam)" opacity="0.55" />
         </g>
+
+        {/* ---- lighthouse: left of the page, standing in the water ---- */}
+        <g className="scene-tower">
+          <path d="M136 892 Q212 828 268 834 Q326 828 400 892 Z" fill="#0E1828" />
+          {/* tapered body */}
+          <path d="M245 852 L256 700 H280 L291 852 Z" fill="#F3EEE3" />
+          <path d="M252 776 L254 752 H282 L284 776 Z" fill="#E0561F" />
+          <path d="M248 828 L250 804 H286 L288 828 Z" fill="#E0561F" />
+          {/* gallery, lamp room, roof */}
+          <rect x="246" y="692" width="44" height="9" rx="2" fill="#16243A" stroke="#F3EEE3" strokeWidth="2.5" />
+          <rect x="255" y="663" width="26" height="29" rx="3" fill="#16243A" />
+          <circle className="scene-lamp-glow" cx={LAMP_X} cy={LAMP_Y} r="30" fill="url(#lk-glow)" />
+          <rect className="scene-lamp" x="259" y="669" width="18" height="18" rx="2" fill="#F2B33D" />
+          <path d="M250 666 L268 642 L286 666 Z" fill="#E0561F" />
+          {/* doorway */}
+          <path d="M261 852 V836 a7 7 0 0 1 14 0 V852 Z" fill="#16243A" />
         </g>
 
         {/* ---- water: three bands, each scrolling at its own pace ---- */}
@@ -85,6 +93,7 @@ export function LighthouseScene({ variant = 'login' }) {
             <use href="#lk-swell" x="0" y="838" />
             <use href="#lk-swell" x="1440" y="838" />
           </g>
+
           {/* between bands on purpose: the nearer water hides the hull */}
           <g className="scene-boat">
             <g className="scene-boat-bob">

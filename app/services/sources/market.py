@@ -159,3 +159,65 @@ def fetch_earnings(tickers: list[str], sessions: list, limit: int = 40,
         print(f"  ! no earnings data for {len(failed)}: {', '.join(failed[:12])}"
               + (" ..." if len(failed) > 12 else ""))
     return pd.DataFrame(rows)
+
+# Fields worth showing a person, and what to call them. Anything Yahoo
+# doesn't return is simply absent rather than shown as zero.
+FUNDAMENTAL_FIELDS = {
+    "longName": "name",
+    "sector": "sector",
+    "industry": "industry",
+    "country": "country",
+    "fullTimeEmployees": "employees",
+    "marketCap": "market_cap",
+    "trailingPE": "pe_trailing",
+    "forwardPE": "pe_forward",
+    "priceToBook": "price_to_book",
+    "trailingEps": "eps",
+    "dividendYield": "dividend_yield",
+    "beta": "beta",
+    "fiftyTwoWeekHigh": "high_52w",
+    "fiftyTwoWeekLow": "low_52w",
+    "totalRevenue": "revenue",
+    "revenueGrowth": "revenue_growth",
+    "profitMargins": "profit_margin",
+    "returnOnEquity": "return_on_equity",
+    "debtToEquity": "debt_to_equity",
+    "freeCashflow": "free_cash_flow",
+    "targetMeanPrice": "analyst_target",
+    "recommendationKey": "analyst_view",
+    "numberOfAnalystOpinions": "analyst_count",
+    "longBusinessSummary": "about",
+}
+
+
+def fetch_fundamentals(tickers: list[str], pause: float = 0.4,
+                       progress=None) -> list[dict]:
+    """Company facts per ticker.
+
+    Yahoo's info endpoint is slow and occasionally returns nothing, so each
+    ticker is fetched independently and a failure costs only that one.
+    """
+    import yfinance as yf
+
+    out = []
+    for i, t in enumerate(tickers, 1):
+        if progress:
+            progress(i, len(tickers), t)
+        try:
+            info = yf.Ticker(t).get_info()
+            time.sleep(pause)
+        except Exception:  # noqa: BLE001
+            continue
+        if not isinstance(info, dict) or not info:
+            continue
+        payload = {}
+        for src, dest in FUNDAMENTAL_FIELDS.items():
+            value = info.get(src)
+            if value in (None, "", "None"):
+                continue
+            if dest == "about":
+                value = str(value)[:600]
+            payload[dest] = value
+        if payload:
+            out.append({"ticker": t, "known_at": pd.Timestamp.now(), "payload": payload})
+    return out

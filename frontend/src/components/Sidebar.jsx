@@ -7,9 +7,9 @@ import { useSummary } from '../lib/useSummary';
 const nav = [
   ['/overview', 'Overview', Grid2X2],
   ['/signals', 'Signal log', Bell],
-  ['/course', 'Chart a course', Map],
+  ['/course', 'Portfolio Recommendations', Map],
   ['/holdings', 'Holdings', Anchor],
-  ['/weather', 'Weather report', Cloud],
+  ['/weather', 'Macro Economic Report', Cloud],
   ['/drivers', 'What moves my stocks', ShipWheel],
 ];
 

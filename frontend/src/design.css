@@ -243,7 +243,13 @@ input {
   font-size: 14px;
   text-align: center;
 }
-.onboard-main .table-empty { border-top: 1.5px solid var(--line); }
+/* the empty state spans the whole table, rather than being squeezed into
+   the first column of the grid */
+.onboard-main .table-empty {
+  border-top: 1.5px solid var(--line);
+  grid-column: 1 / -1;
+  width: 100%;
+}
 
 .steps .done b { background: var(--blue); color: #fff; }
 .steps .done span { color: #AEB8C6; }
@@ -351,8 +357,12 @@ input {
 .badge-dot.quiet { background: #3A4D68; color: #AEB8C6; }
 
 /* treemap built from live weights */
-.treemap-live { display: flex; flex-direction: column; gap: 4px; height: 210px; }
-.tm-band { display: flex; gap: 4px; min-height: 0; }
+/* A band sized purely by weight collapses to a few pixels when a holding
+   is tiny, and its label spills over whatever follows. Bands keep a floor
+   height and the treemap grows to fit, so nothing overlaps. */
+.treemap-live { display: flex; flex-direction: column; gap: 4px; min-height: 210px; }
+.tm-band { display: flex; gap: 4px; min-height: 58px; }
+.tm-cell { min-width: 0; overflow: hidden; }
 .tm-cell {
   display: flex; flex-direction: column; justify-content: space-between;
   padding: 10px; border-radius: 8px; min-width: 0; overflow: hidden;
@@ -619,11 +629,11 @@ input {
 .fp-move { font-family: "JetBrains Mono", monospace; font-size: 13px; text-align: right; font-weight: 700; }
 
 .ev-table { margin-top: 8px; }
-.ev-head, .ev-row { display: grid; grid-template-columns: 88px minmax(0, 1fr) 62px 62px 64px; gap: 8px; align-items: center; }
+.ev-head, .ev-row { display: grid; grid-template-columns: 74px minmax(0, 1fr) 46px 46px 50px; gap: 6px; align-items: center; }
 .ev-head { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.06em; padding-bottom: 6px; border-bottom: 1.5px solid var(--line); }
 .ev-head span:nth-child(n+3), .ev-row span:nth-child(n+3) { text-align: right; }
 .ev-row { padding: 7px 0; border-bottom: 1.5px solid #F1EADB; font-size: 13px; }
-.ev-row .mono { font-family: "JetBrains Mono", monospace; font-size: 12px; }
+.ev-row .mono { font-family: "JetBrains Mono", monospace; font-size: 11.5px; }
 .ev-row .muted-num { color: var(--muted); }
 .ev-row .strong { font-weight: 700; }
 
@@ -669,3 +679,100 @@ input {
 .news-summary { margin: 5px 0 0; font-size: 13.5px; line-height: 1.5; color: #3F4652; }
 .news-meta-row { display: flex; gap: 12px; margin-top: 6px; font-size: 11.5px; color: var(--muted); }
 .source-articles { margin: 4px 0 10px; }
+/* --------------------------------------------------------------------------
+   Holdings: panels that match their neighbour and scroll inside
+   -------------------------------------------------------------------------- */
+/* The evidence list is long and its neighbour is short. Stretching the row
+   would drag "What moves ..." down to match, so instead the evidence table
+   is capped and scrolls: the two panels end up about the same height and
+   nothing runs down the page alone. */
+.evidence-card { display: flex; flex-direction: column; }
+.ev-scroll {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 6px;     /* keeps rows clear of the scrollbar */
+}
+/* the header row stays put while the rows move under it */
+.ev-scroll .ev-head {
+  position: sticky;
+  top: 0;
+  background: var(--paper);
+  z-index: 1;
+}
+
+/* Recent coverage: two stories visible, the rest a scroll away. */
+.news-scroll {
+  max-height: 232px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+.news-scroll .news-item:last-child { border-bottom: 0; }
+
+/* A quieter scrollbar than the platform default. */
+.ev-scroll::-webkit-scrollbar,
+.news-scroll::-webkit-scrollbar { width: 8px; }
+.ev-scroll::-webkit-scrollbar-thumb,
+.news-scroll::-webkit-scrollbar-thumb { background: #D9CFBB; border-radius: 4px; }
+.ev-scroll::-webkit-scrollbar-track,
+.news-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* The evidence panel is narrow, so the event name stays on one line and
+   truncates; the full text is on the row's tooltip. */
+.ev-row > span:nth-child(2) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+.ev-head { font-size: 9.5px; letter-spacing: 0.04em; }
+
+/* --------------------------------------------------------------------------
+   What moves my stocks: the map fills its panel however many stocks you own
+   -------------------------------------------------------------------------- */
+/* Both columns end level, so the map can use the full height the detail
+   panel beside it occupies. */
+.drivers-layout { align-items: stretch; }
+
+.map-card { display: flex; flex-direction: column; }
+/* the scroller takes the leftover height and hands it to the grid */
+.map-card .heat-scroll { flex: 1 1 auto; display: flex; min-height: 0; }
+.map-card .heat-grid { flex: 1 1 auto; align-content: stretch; }
+/* cells stretch with their row rather than sitting at a fixed 38px */
+.map-card .heat-grid button { height: 100%; min-height: 46px; font-size: 13px; }
+.map-card .heat-grid > b,
+.map-card .heat-grid > strong { font-size: 12px; }
+
+/* the takeaway line sits at the foot of the card, not floating mid-panel */
+.map-card > .callout,
+.map-card > .heat-note { margin-top: 14px; }
+
+/* --------------------------------------------------------------------------
+   Holdings: the company behind the ticker
+   -------------------------------------------------------------------------- */
+.fundamentals-card { display: flex; flex-direction: column; }
+.fund-about { font-size: 13.5px; line-height: 1.55; color: #3F4652; margin: 8px 0 12px; }
+
+.range-52 { margin-bottom: 14px; }
+.range-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--muted); }
+.range-head b { font-family: "JetBrains Mono", monospace; font-size: 13px; color: var(--ink); }
+.range-track {
+  position: relative; height: 10px; margin: 6px 0 4px; border-radius: 5px;
+  background: linear-gradient(90deg, #CFE2EE 0%, #8DB8D6 50%, #2F6B99 100%);
+}
+/* the marker is the only moving part: where today sits in the year */
+.range-track i {
+  position: absolute; top: -3px; width: 4px; height: 16px; border-radius: 2px;
+  background: var(--orange); transform: translateX(-2px);
+}
+.range-note { font-size: 11.5px; color: var(--muted); }
+
+.fund-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+.fund-grid > div {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  padding: 7px 0; border-bottom: 1.5px solid #F1EADB;
+}
+.fund-grid span { font-size: 13px; color: #4A5262; }
+.fund-grid b { font-family: "JetBrains Mono", monospace; font-size: 13.5px; white-space: nowrap; }
+
+.fundamentals-card .callout { margin-top: 12px; }
+.fund-stamp { margin-top: 10px; font-size: 11px; color: var(--muted); font-family: "JetBrains Mono", monospace; }

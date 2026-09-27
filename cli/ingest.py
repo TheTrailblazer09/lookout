@@ -17,6 +17,7 @@ import pandas as pd
 from flask.cli import with_appcontext
 
 from app.models import event as event_model
+from app.models import fundamental as fundamental_model
 from app.models import indicator as indicator_model
 from app.models.base import insert_df, query, truncate
 from app.services.sources import macro as macro_source
@@ -50,8 +51,10 @@ def _available(universe: list[str]) -> list[str]:
 @click.option("--skip-prices", is_flag=True)
 @click.option("--skip-earnings", is_flag=True)
 @click.option("--skip-macro", is_flag=True)
+@click.option("--skip-fundamentals", is_flag=True)
 @with_appcontext
-def ingest_command(start, end, tickers, skip_prices, skip_earnings, skip_macro):
+def ingest_command(start, end, tickers, skip_prices, skip_earnings, skip_macro,
+                   skip_fundamentals):
     """Fetch real prices, earnings and macro releases."""
     universe = [t.strip().upper() for t in tickers.split(",")] if tickers else list(cfg.UNIVERSE)
     end = end or str(dt.date.today())
@@ -103,6 +106,17 @@ def ingest_command(start, end, tickers, skip_prices, skip_earnings, skip_macro):
             ev = macro_source.to_events(inds, sessions)
             n = event_model.upsert(ev)
             click.echo(f"  {n:,} macro events")
+
+    if not skip_fundamentals:
+        held = _available(universe)
+        click.echo(f"company facts: {len(held)} tickers")
+
+        def _tick(i, total, ticker):
+            click.echo(f"\r  [{i:>3}/{total}] {ticker:<6}", nl=False)
+
+        rows = market_source.fetch_fundamentals(held, progress=_tick)
+        click.echo("")
+        click.echo(f"  stored {fundamental_model.replace(rows)} company profiles")
 
     click.echo("\nevents by type:")
     counts = event_model.counts_by_type()

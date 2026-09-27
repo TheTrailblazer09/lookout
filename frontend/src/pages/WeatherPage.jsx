@@ -74,16 +74,16 @@ export default function WeatherPage() {
 
   if (state === 'loading') {
     return (
-      <Shell title="Weather report">
+      <Shell title="Macro Economic Report">
         <div className="page-state">Reading the conditions…</div>
       </Shell>
     );
   }
   if (state === 'error') {
     return (
-      <Shell title="Weather report">
+      <Shell title="Macro Economic Report">
         <div className="page-state error">
-          <b>Couldn't load the weather.</b>
+          <b>Couldn't load the macro economic report.</b>
           <span>Check that the backend is running.</span>
         </div>
       </Shell>
@@ -91,7 +91,7 @@ export default function WeatherPage() {
   }
   if (state === 'empty') {
     return (
-      <Shell title="Weather report">
+      <Shell title="Macro Economic Report">
         <div className="page-state">
           <b>No holdings yet.</b>
           <span>Add what you own to see which forces push it around.</span>
@@ -107,7 +107,7 @@ export default function WeatherPage() {
 
   return (
     <Shell
-      title="Weather report"
+      title="Macro Economic Report"
       subtitle="The big forces that push all your stocks at once, and how hard they push yours."
     >
       <div className="weather-top">

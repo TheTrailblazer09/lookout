@@ -124,14 +124,14 @@ export default function CoursePage() {
 
   if (state === 'loading') {
     return (
-      <Shell title="Chart a course">
+      <Shell title="Portfolio Recommendations">
         <div className="page-state">Working out what's worth considering…</div>
       </Shell>
     );
   }
   if (state === 'error') {
     return (
-      <Shell title="Chart a course">
+      <Shell title="Portfolio Recommendations">
         <div className="page-state error">
           <b>Couldn't load your plan.</b>
           <span>Check that the backend is running.</span>
@@ -141,7 +141,7 @@ export default function CoursePage() {
   }
   if (state === 'empty') {
     return (
-      <Shell title="Chart a course">
+      <Shell title="Portfolio Recommendations">
         <div className="page-state">
           <b>No holdings yet.</b>
           <span>Add what you own and Lookout can suggest what to think about.</span>
@@ -161,7 +161,7 @@ export default function CoursePage() {
 
   return (
     <Shell
-      title="Chart a course"
+      title="Portfolio Recommendations"
       subtitle="Things worth thinking about, drawn from your own holdings and the rules you set."
     >
       <div className="disclaimer">

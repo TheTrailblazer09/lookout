@@ -35,36 +35,37 @@
 
 .scene-stars circle { fill: #F3EEE3; opacity: 0.55; }
 
-/* Where the lighthouse stands. Changing this one line moves the tower,
-   its rock and the beam together. */
-.scene-light { transform: translate(430px, 22px); }
-
 /* A real lighthouse lamp turns continuously, so the beam goes all the way
    round: out to the right, toward the viewer, away to the left, and back.
    The turn is linear because a rotating lamp has no reason to ease.
    transform-origin sits on the lamp in user units, not fill-box, so the
    pivot does not shift when the cone is clipped. */
+/* The pivot must match LAMP_X / LAMP_Y in LighthouseScene.jsx. CSS
+   resolves transform-origin against the SVG viewport, so these are
+   absolute viewBox coordinates, not local ones. */
 .scene-beam {
-  transform-origin: 300px 616px;
-  animation: lk-turn 16s linear infinite;
+  transform-origin: 268px 678px;
+  animation: lk-tilt 13s ease-in-out infinite;
   will-change: transform;
 }
-@keyframes lk-turn {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+/* The light points out to sea and tilts slowly up and down. Easing at the
+   ends, because a lamp sweeping a coastline slows as it turns back. */
+@keyframes lk-tilt {
+  0%, 100% { transform: rotate(-16deg); }
+  50%      { transform: rotate(10deg); }
 }
 
 /* the lamp brightens as the beam passes the viewer */
-.scene-lamp-glow { animation: lk-pulse 16s linear infinite; transform-origin: 300px 616px; }
-.scene-lamp { animation: lk-lamp 16s linear infinite; }
+.scene-lamp-glow { animation: lk-pulse 13s ease-in-out infinite; transform-origin: 268px 678px; }
+.scene-lamp { animation: lk-lamp 13s ease-in-out infinite; }
+/* a gentle breathe, in step with the tilt */
 @keyframes lk-pulse {
-  0%, 100%  { opacity: 1;    transform: scale(1.1); }   /* facing us */
-  25%, 75%  { opacity: 0.7;  transform: scale(1); }
-  50%       { opacity: 0.45; transform: scale(0.9); }   /* facing away */
+  0%, 100% { opacity: 0.82; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.12); }
 }
 @keyframes lk-lamp {
-  0%, 100% { fill: #FFE9B0; }
-  50%      { fill: #C9902E; }
+  0%, 100% { fill: #F0C260; }
+  50%      { fill: #FFE9B0; }
 }
 
 /* --- the boat: drift across on one timer, bob on another, so the two
@@ -107,7 +108,7 @@
     animation: none !important;
   }
   .scene-boat { transform: translate(680px, 832px); }
-  .scene-beam { transform: rotate(-8deg); }
+  .scene-beam { transform: rotate(-4deg); }
 }
 
 /* Onboarding shows the scene as a band at the foot of the left column.

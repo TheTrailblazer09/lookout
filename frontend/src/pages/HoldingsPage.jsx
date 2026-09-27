@@ -78,19 +78,34 @@ function StockChart({ series, pins, active, onHover }) {
         );
       })}
 
-      {/* the hovered pin's label, flipped to whichever side has room */}
+      {/* The hovered pin's label in full. SVG text does not wrap, so the
+          label is split into lines here and the box is sized to fit them,
+          then flipped to whichever side has room. */}
       {hovered && (() => {
-        const text = `${hovered.date} · ${hovered.label}`;
-        const w = Math.min(330, 7 * text.length + 18);
-        const left = hovered.cx + w + 14 > W;
-        const bx = left ? hovered.cx - w - 14 : hovered.cx + 14;
-        const by = Math.max(pad.t, Math.min(hovered.cy - 14, H - pad.b - 30));
+        const words = `${hovered.date} · ${hovered.label}`.split(' ');
+        const MAX = 42;                 // characters per line
+        const lines = [];
+        words.forEach((w) => {
+          const last = lines[lines.length - 1];
+          if (last && (`${last} ${w}`).length <= MAX) lines[lines.length - 1] = `${last} ${w}`;
+          else lines.push(w);
+        });
+
+        const LINE = 15;
+        const w = Math.min(340, Math.max(...lines.map((l) => l.length)) * 6.3 + 20);
+        const h = lines.length * LINE + 14;
+        const flip = hovered.cx + w + 16 > W;
+        const bx = flip ? Math.max(2, hovered.cx - w - 16) : hovered.cx + 16;
+        const by = Math.max(pad.t, Math.min(hovered.cy - h / 2, H - pad.b - h));
+
         return (
           <g pointerEvents="none">
-            <rect x={bx} y={by} width={w} height="28" rx="6" fill="#16243A" />
-            <text x={bx + 9} y={by + 18} fontSize="12" fill="#F3EEE3">
-              {text.length > 46 ? `${text.slice(0, 46)}…` : text}
-            </text>
+            <rect x={bx} y={by} width={w} height={h} rx="6" fill="#16243A" opacity="0.97" />
+            {lines.map((line, i) => (
+              <text key={line + i} x={bx + 10} y={by + 18 + i * LINE} fontSize="12" fill="#F3EEE3">
+                {line}
+              </text>
+            ))}
           </g>
         );
       })()}
@@ -147,6 +162,112 @@ function RsiGauge({ value }) {
       <b>{value}</b>
       <span>RSI · {state}</span>
     </div>
+  );
+}
+
+
+/** Money in the sizes people actually say them in. */
+function big(n) {
+  if (n == null) return null;
+  const abs = Math.abs(n);
+  if (abs >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
+  if (abs >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+  if (abs >= 1e6) return `$${(n / 1e6).toFixed(0)}M`;
+  return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
+
+const pctOf = (v, digits = 1) => (v == null ? null : `${(v * 100).toFixed(digits)}%`);
+
+/** The company behind the ticker: what it does, what it's worth, how it
+ *  earns. Facts about the business, as opposed to the price behaviour the
+ *  rest of the page covers. */
+function Fundamentals({ f, ticker, price }) {
+  if (!f) {
+    return (
+      <Card>
+        <h2>About {ticker}</h2>
+        <div className="chart-empty">
+          No company profile stored yet. Run <code>flask ingest</code> to fetch it.
+        </div>
+      </Card>
+    );
+  }
+
+  const rows = [
+    ['Market value', big(f.market_cap)],
+    ['Revenue (12m)', big(f.revenue)],
+    ['Revenue growth', pctOf(f.revenue_growth)],
+    ['Profit margin', pctOf(f.profit_margin)],
+    ['Earnings per share', f.eps != null ? `$${f.eps.toFixed(2)}` : null],
+    ['Price / earnings', f.pe_trailing != null ? f.pe_trailing.toFixed(1) : null],
+    ['Forward P/E', f.pe_forward != null ? f.pe_forward.toFixed(1) : null],
+    ['Return on equity', pctOf(f.return_on_equity)],
+    ['Dividend yield', f.dividend_yield ? pctOf(f.dividend_yield, 2) : 'None'],
+    ['Free cash flow', big(f.free_cash_flow)],
+    ['Debt to equity', f.debt_to_equity != null ? f.debt_to_equity.toFixed(0) : null],
+    ['Beta', f.beta != null ? f.beta.toFixed(2) : null],
+  ].filter(([, v]) => v != null);
+
+  return (
+    <Card className="fundamentals-card">
+      <div className="card-title-row">
+        <div>
+          <h2>{f.name ?? ticker}</h2>
+          <p className="muted">
+            {[f.sector, f.industry].filter(Boolean).join(' · ')}
+            {f.employees ? ` · ${f.employees.toLocaleString()} employees` : ''}
+          </p>
+        </div>
+      </div>
+
+      {f.about && <p className="fund-about">{f.about}</p>}
+
+      {/* where today's price sits between the year's low and high */}
+      {f.low_52w != null && f.high_52w != null && (
+        <div className="range-52">
+          <div className="range-head">
+            <span>52-week range</span>
+            <b>
+              ${f.low_52w.toFixed(0)} – ${f.high_52w.toFixed(0)}
+            </b>
+          </div>
+          <div className="range-track">
+            <i style={{ left: `${Math.min(100, Math.max(0, f.range_position_pct ?? 0))}%` }} />
+          </div>
+          <span className="range-note">
+            {f.range_position_pct != null
+              ? `Today sits ${f.range_position_pct}% of the way up that range.`
+              : ''}
+          </span>
+        </div>
+      )}
+
+      <div className="fund-grid">
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <span>{label}</span>
+            <b>{value}</b>
+          </div>
+        ))}
+      </div>
+
+      {f.analyst_target != null && (
+        <div className="callout">
+          Analysts' average target is ${f.analyst_target.toFixed(0)}
+          {f.vs_target_pct != null && (
+            <>
+              , {Math.abs(f.vs_target_pct)}% {f.vs_target_pct >= 0 ? 'above' : 'below'} today's
+              price
+            </>
+          )}
+          {f.analyst_count ? ` (${f.analyst_count} analysts` : ''}
+          {f.analyst_view ? `, view: ${f.analyst_view}` : ''}
+          {f.analyst_count ? ')' : ''}. A target is an opinion, not a measurement.
+        </div>
+      )}
+
+      {f.fetched_at && <div className="fund-stamp">Company facts as of {f.fetched_at}</div>}
+    </Card>
   );
 }
 
@@ -348,40 +469,16 @@ export default function HoldingsPage() {
           </div>
 
           <div className="holding-grid">
-            <Card>
-              <h2>What moves {detail.ticker}</h2>
-              <p className="muted">
-                Typical move after each kind of event, next to what an ordinary stretch looks
-                like. Above 1.0× means the event genuinely matters to this stock.
-              </p>
-              {detail.fingerprint.length === 0 && (
-                <div className="chart-empty">
-                  No measured events yet. Run <code>flask build</code>.
-                </div>
-              )}
-              {detail.fingerprint.map((f) => (
-                <div className="fp-row" key={f.event_type}>
-                  <div>
-                    <b>{f.event_type}</b>
-                    <span>{f.n} events{f.reliable ? ' · reliable' : ''}</span>
-                  </div>
-                  <div className="fp-bar">
-                    <i style={{ width: `${Math.min(100, (f.vs_baseline / 2) * 100)}%` }} />
-                    <em>{f.vs_baseline}×</em>
-                  </div>
-                  <span className="fp-move">±{f.typical_move_pct}%</span>
-                </div>
-              ))}
-            </Card>
+            <Fundamentals f={detail.fundamentals} ticker={detail.ticker} price={pos?.price} />
 
-            <Card>
+            <Card className="evidence-card">
               <h2>The evidence</h2>
               <p className="muted">
                 Every past event, and what actually happened to {detail.ticker} afterwards.
               </p>
               {detail.evidence.length === 0 && <div className="chart-empty">Nothing recorded yet.</div>}
               {detail.evidence.length > 0 && (
-                <div className="ev-table">
+                <div className="ev-table ev-scroll">
                   <div className="ev-head">
                     <span>DATE</span>
                     <span>EVENT</span>
@@ -422,7 +519,8 @@ export default function HoldingsPage() {
                   </Tag>
                 ))}
               </div>
-              {detail.news.articles.map((a) => (
+              <div className="news-scroll">
+                {detail.news.articles.map((a) => (
                 <article className="news-item" key={a.url}>
                   <div className="news-item-head">
                     <span className="mono">{a.date}</span>
@@ -443,7 +541,8 @@ export default function HoldingsPage() {
                     <span>relevance {a.relevance}</span>
                   </div>
                 </article>
-              ))}
+                ))}
+              </div>
             </Card>
           )}
         </>
