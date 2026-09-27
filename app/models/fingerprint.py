@@ -36,7 +36,15 @@ def for_ticker(ticker: str, as_of: str, direction: str | None = None) -> pd.Data
 
 
 def cell(ticker: str, event_type: str, as_of: str, direction: str = "all") -> dict | None:
+    """One cell of the fingerprint, or None when we have no history for it.
+
+    An empty DataFrame carries no columns, so the column test has to come
+    after the empty test: a stock with no measured events is normal (a new
+    holding, or a date before its first event window closed), not an error.
+    """
     df = for_ticker(ticker, as_of, direction)
+    if df.empty or "event_type" not in df.columns:
+        return None
     hit = df[df["event_type"] == event_type]
     return None if hit.empty else hit.iloc[0].to_dict()
 

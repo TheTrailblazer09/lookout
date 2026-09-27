@@ -35,4 +35,5 @@ def overview():
         risk_share={k: r2(v) for k, v in stats["risk_share"].items()},
         correlation=stats["correlation"],
         series=stats["series"],
+        pins=stats["pins"],
     )

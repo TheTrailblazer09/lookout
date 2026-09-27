@@ -16,6 +16,7 @@ import pandas as pd
 
 from app.models import portfolio as portfolio_model
 from app.models import price as price_model
+from app.models.base import query, visible
 from config import get_config
 
 cfg = get_config()
@@ -83,12 +84,14 @@ def analyze(portfolio_id: str, as_of: str, lookback: int = TRADING_DAYS) -> dict
 
     day = float(port.iloc[-1] / port.iloc[-2] - 1) if len(port) > 1 else 0.0
     daily_sd = float(port_ret.std()) or 1e-9
-    sea = ("Stormy" if abs(day) > 2.5 * daily_sd else
-           "Choppy" if abs(day) > 1.2 * daily_sd else "Calm")
+    sea = _sea_state(day, daily_sd)
+
+    pins = _pins(tickers, str(cum.index[0]), as_of)
 
     return {
         "empty": False,
         "as_of": as_of,
+        "pins": pins,
         "value": float(port.iloc[-1]),
         "day_change_pct": day * 100,
         "return_pct": float(cum.iloc[-1]) * 100,
@@ -107,6 +110,68 @@ def analyze(portfolio_id: str, as_of: str, lookback: int = TRADING_DAYS) -> dict
                     "market": round(float(m) * 100, 2)}
                    for d, p, m in zip(cum.index[::3], cum.values[::3], spy_cum.values[::3])],
     }
+
+
+# Absolute floors, on top of the "unusual for this portfolio" test.
+# A portfolio of jumpy stocks has a wide normal range, so judging purely
+# against its own history would call a 4% drop ordinary and say nothing.
+# Two questions matter to a person: is this unusual FOR ME, and is it a big
+# move in plain terms? Either one triggers.
+STORMY_MOVE, CHOPPY_MOVE = 0.05, 0.025
+
+
+def _sea_state(day_return: float, daily_sd: float) -> str:
+    move = abs(day_return)
+    if move > STORMY_MOVE or move > 2.5 * daily_sd:
+        return "Stormy"
+    if move > CHOPPY_MOVE or move > 1.2 * daily_sd:
+        return "Choppy"
+    return "Calm"
+
+
+def _pins(tickers: list[str], start: str, as_of: str) -> list[dict]:
+    """Moments worth marking on the performance line.
+
+    Earnings are marked because they are the single biggest scheduled
+    source of movement in a stock; alert days are marked because they are
+    what Lookout itself flagged. Both are capped: a line peppered with
+    thirty pins tells you nothing, so we keep the most significant ones.
+    """
+    if not tickers:
+        return []
+    names = ", ".join(f"'{t.upper()}'" for t in tickers)
+    earnings = query(f"""
+        SELECT day0 AS date, ticker, subtype, abs(surprise_z) AS weight
+        FROM {visible('events', as_of)}
+        WHERE type = 'earnings' AND ticker IN ({names})
+          AND day0 BETWEEN DATE '{start}' AND DATE '{as_of}'
+        ORDER BY weight DESC NULLS LAST
+        LIMIT 8
+    """)
+    alerts = query(f"""
+        SELECT as_of AS date, ticker, severity
+        FROM alerts
+        WHERE severity IN ('Storm', 'Choppy')
+          AND as_of BETWEEN DATE '{start}' AND DATE '{as_of}'
+        ORDER BY as_of DESC
+        LIMIT 6
+    """)
+
+    pins = [
+        {"date": str(r.date)[:10], "kind": "earnings", "ticker": r.ticker,
+         "label": f"{r.ticker} earnings ({r.subtype})"}
+        for r in earnings.itertuples()
+    ] + [
+        {"date": str(r.date)[:10], "kind": "alert", "ticker": r.ticker,
+         "label": f"{r.severity}: {r.ticker}"}
+        for r in alerts.itertuples()
+    ]
+    # one pin per day, alerts winning, so markers never stack illegibly
+    best: dict[str, dict] = {}
+    for pin in pins:
+        if pin["date"] not in best or pin["kind"] == "alert":
+            best[pin["date"]] = pin
+    return sorted(best.values(), key=lambda p: p["date"])
 
 
 def simulate(portfolio_id: str, as_of: str, changes: dict[str, float]) -> dict:

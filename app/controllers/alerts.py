@@ -3,7 +3,10 @@ from flask import Blueprint, jsonify, request
 
 from app.models import alert as alert_model
 from app.models import evidence as evidence_model
+from app.models import portfolio as portfolio_model
 from app.services import auth as auth_service
+from app.services import severity as severity_service
+from app.services.bots import technical as technical_bot
 from app.utils.errors import ApiError
 from config import get_config
 
@@ -11,11 +14,34 @@ cfg = get_config()
 bp = Blueprint("alerts", __name__, url_prefix="/alerts")
 
 
+def _ensure(as_of: str, portfolio_id: str) -> None:
+    """Build this day's alerts if nobody has yet.
+
+    Alerts are normally precomputed by `flask alerts`, which is what keeps
+    the demo instant. But the time machine can land on any date, and an
+    empty screen there looks like the product is broken rather than like a
+    day nobody prepared. So on a miss we run the bots for the held tickers
+    and generate once; the rows are stored, so the same date is instant
+    afterwards.
+    """
+    if alert_model.for_day(as_of, portfolio_id):
+        return
+    holdings = portfolio_model.get_holdings(portfolio_id)["ticker"].tolist()
+    if not holdings:
+        return
+    # a short lookback: we only need events dated on or near this day
+    technical_bot.run(as_of, tickers=holdings, lookback_days=5)
+    severity_service.build(as_of, portfolio_id, use_llm=True)
+
+
 @bp.get("")
 @auth_service.optional_auth
 def list_alerts():
     as_of = request.args.get("as_of") or cfg.default_as_of()
-    rows = alert_model.for_day(as_of, auth_service.portfolio_id(),
+    portfolio_id = auth_service.portfolio_id()
+    if request.args.get("generate", "1") != "0":
+        _ensure(as_of, portfolio_id)
+    rows = alert_model.for_day(as_of, portfolio_id,
                                request.args.get("category"))
     return jsonify(as_of=as_of, count=len(rows), alerts=[{
         "id": r["id"], "ticker": r["ticker"], "severity": r["severity"],

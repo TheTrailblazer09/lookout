@@ -30,30 +30,46 @@ FACT_TABLES = {
 }
 
 
+_conn: duckdb.DuckDBPyConnection | None = None
+
+
+def _root() -> duckdb.DuckDBPyConnection:
+    """One connection per process, opened read-write.
+
+    DuckDB refuses to open the same file twice in one process with
+    different settings, so a mix of read-only and read-write handles blows
+    up the moment a request reads and then writes. Holding a single
+    connection and handing out cursors is the supported pattern: cursors
+    are independent enough for Flask's threads, and there is only ever one
+    configuration.
+    """
+    global _conn
+    if _conn is None:
+        with _lock:
+            if _conn is None:
+                _cfg.DATA_DIR.mkdir(parents=True, exist_ok=True)
+                _conn = duckdb.connect(str(_cfg.DB_PATH))
+    return _conn
+
+
 def init_db() -> None:
     """Create the file and every table. Safe to run repeatedly."""
-    _cfg.DATA_DIR.mkdir(parents=True, exist_ok=True)
     with connect() as con:
         con.execute(_SCHEMA.read_text())
 
 
 @contextmanager
 def connect(read_only: bool = False):
-    """A short-lived connection. DuckDB allows one writer, so writes are
-    serialized with a lock; reads open their own handle."""
-    if read_only:
-        con = duckdb.connect(str(_cfg.DB_PATH), read_only=True)
-        try:
-            yield con
-        finally:
-            con.close()
-    else:
-        with _lock:
-            con = duckdb.connect(str(_cfg.DB_PATH))
-            try:
-                yield con
-            finally:
-                con.close()
+    """A cursor on the shared connection.
+
+    read_only is accepted so existing call sites keep working, but it no
+    longer opens a second handle; it is documentation of intent only.
+    """
+    cur = _root().cursor()
+    try:
+        yield cur
+    finally:
+        cur.close()
 
 
 def visible(table: str, as_of: str, alias: str | None = None) -> str:
@@ -81,14 +97,15 @@ def query_one(sql: str, params: list | tuple | None = None):
 
 
 def execute(sql: str, params: list | tuple | None = None) -> None:
-    with connect() as con:
+    # writes are serialized: DuckDB allows one writer at a time
+    with _lock, connect() as con:
         con.execute(sql, params or [])
 
 
 def execute_many(sql: str, rows: list[tuple]) -> None:
     if not rows:
         return
-    with connect() as con:
+    with _lock, connect() as con:
         con.executemany(sql, rows)
 
 
@@ -102,7 +119,7 @@ def insert_df(table: str, df: pd.DataFrame, replace: bool = False) -> int:
         raise ValueError(
             f"insert into {table}: columns {bad} contain non-scalar values "
             "(usually a duplicated pandas index turning .loc into a Series)")
-    with connect() as con:
+    with _lock, connect() as con:
         if replace:
             con.execute(f"DELETE FROM {table}")
         con.register("_incoming", df)
@@ -113,7 +130,7 @@ def insert_df(table: str, df: pd.DataFrame, replace: bool = False) -> int:
 
 
 def truncate(*tables: str) -> None:
-    with connect() as con:
+    with _lock, connect() as con:
         for t in tables:
             con.execute(f"DELETE FROM {t}")
 
