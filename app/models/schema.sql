@@ -153,3 +153,9 @@ CREATE TABLE IF NOT EXISTS feedback (
   vote       TEXT,
   created_at TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS preferences (
+  portfolio_id TEXT,
+  payload      TEXT,
+  updated_at   TIMESTAMP
+);
