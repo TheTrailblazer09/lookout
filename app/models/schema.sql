@@ -159,3 +159,10 @@ CREATE TABLE IF NOT EXISTS preferences (
   payload      TEXT,
   updated_at   TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS summaries (
+  portfolio_id TEXT,
+  as_of        DATE,
+  payload      TEXT,
+  created_at   TIMESTAMP
+);

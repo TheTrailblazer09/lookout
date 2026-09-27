@@ -13,6 +13,7 @@ same for everyone so the wording stays comparable across portfolios.
 from __future__ import annotations
 
 import json
+import time
 import uuid
 
 import numpy as np
@@ -60,11 +61,14 @@ def build(as_of: str, portfolio_id: str, use_llm: bool = True) -> list[dict]:
         return []
     total = float(hold["value"].sum())
 
+    # what this person has told us they care about
+    weights_by_category = alert_model.category_weights(portfolio_id)
     todays = event_model.on_day(as_of)
     upcoming = event_model.upcoming(as_of, days=7, tickers=hold["ticker"].tolist())
     preds = prediction_model.latest(hold["ticker"].tolist(), as_of)
     how_counts: dict[str, int] = {}
     rows = []
+    deadline = time.monotonic() + getattr(cfg, "NARRATION_BUDGET_SECONDS", 45)
 
     for h in hold.itertuples():
         t = h.ticker
@@ -96,7 +100,10 @@ def build(as_of: str, portfolio_id: str, use_llm: bool = True) -> list[dict]:
 
         day_move = float(h.day_return) if not pd.isna(h.day_return) else 0.0
         weight = float(h.weight)
-        impact = p * weight * max(typical, abs(day_move))
+        raw_impact = p * weight * max(typical, abs(day_move))
+        category = CATEGORY.get(etype, etype.title())
+        taste = weights_by_category.get(category, 1.0)
+        impact = raw_impact * taste
         severity = _severity(impact, day_move)
 
         analogs = evidence_model.analogs(
@@ -108,7 +115,7 @@ def build(as_of: str, portfolio_id: str, use_llm: bool = True) -> list[dict]:
             "ticker": t,
             "as_of": as_of,
             "when": when,
-            "category": CATEGORY.get(etype, etype.title()),
+            "category": category,
             "headline": str(ev["description"]),
             "day_move_pct": round(day_move * 100, 1),
             "weight_pct": round(weight * 100, 1),
@@ -116,6 +123,9 @@ def build(as_of: str, portfolio_id: str, use_llm: bool = True) -> list[dict]:
             "portfolio_impact_pct": round(day_move * weight * 100, 2),
             "risk_probability_pct": round(p * 100, 1),
             "typical_move_pct": round(typical * 100, 1),
+            # the same figure in money: "3.1%" means nothing until it is
+            # "$82 of yours", and the narrator must never multiply itself
+            "typical_move_dollars": int(round(float(h.value) * typical)),
             "baseline_move_pct": round(baseline * 100, 1),
             "n_past": n_past,
             "drivers": [{"label": d["label"], "direction": d["direction"]} for d in drivers],
@@ -127,15 +137,28 @@ def build(as_of: str, portfolio_id: str, use_llm: bool = True) -> list[dict]:
                 for a in analogs.itertuples() if pd.notna(a.abnormal_ret)
             ]
 
-        text, how = narrator.narrate(facts) if use_llm else (narrator.template(facts), "template")
+        # Past the budget we stop asking the model and store the alert
+        # without prose. The next page load picks it up and writes it,
+        # because unwritten alerts are treated as stale.
+        within_budget = time.monotonic() < deadline
+        text, how = (narrator.narrate(facts) if (use_llm and within_budget)
+                     else (None, "skipped" if not use_llm else "out-of-time"))
+        if text:
+            # who wrote this, stored with the text itself. Without it we
+            # cannot tell a model-written alert from one left over by an
+            # older build, and stale rows never get rewritten.
+            text = {**text, "_by": how, "_model": cfg.LLM_FAST}
         how_counts[how] = how_counts.get(how, 0) + 1
-        ok, _ = narrator.grounded(" ".join(text.values()), facts)
+        # No text is a valid state: the screen shows the facts and says the
+        # local model is not writing. Better an honest gap than prose that
+        # pretends to be the model's.
+        ok = bool(text) and narrator.grounded(" ".join(text.values()), facts)[0]
 
         rows.append({
             "id": f"{portfolio_id}:{uuid.uuid4().hex[:8]}",
             "as_of": as_of, "ticker": t, "severity": severity,
             "category": facts["category"],
-            "facts": json.dumps(facts), "text": json.dumps(text),
+            "facts": json.dumps(facts), "text": json.dumps(text) if text else None,
             "analog_event_ids": json.dumps(analogs["event_id"].tolist() if not analogs.empty else []),
             "grounded": bool(ok),
             "_impact": impact, "_how": how,

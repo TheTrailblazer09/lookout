@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from app.models import portfolio as portfolio_model
+from app.models import preference as preference_model
 from app.models import price as price_model
 from app.models.base import query, visible
 from config import get_config
@@ -174,19 +175,90 @@ def _pins(tickers: list[str], start: str, as_of: str) -> list[dict]:
     return sorted(best.values(), key=lambda p: p["date"])
 
 
-def simulate(portfolio_id: str, as_of: str, changes: dict[str, float]) -> dict:
-    """What the numbers become under new weights. `changes` maps ticker to
-    a new weight in percent; the rest scale to fill what's left."""
-    before = analyze(portfolio_id, as_of)
-    if before.get("empty"):
-        return {"empty": True}
-    weights = dict(before["weights"])
-    for t, target in changes.items():
-        if t in weights:
-            weights[t] = float(target)
+def metrics_for_changes(portfolio_id: str, as_of: str,
+                        changes: dict[str, float]) -> dict:
+    """Recompute the portfolio's numbers under different weights.
+
+    `changes` maps ticker to a new weight in percent; everything else
+    scales proportionally to fill what is left, which is what actually
+    happens when you trim one holding and do not touch the others.
+
+    The same covariance is reused rather than re-estimated: we are asking
+    "what if I held different amounts of these same stocks", not "what if
+    the market behaved differently".
+    """
+    base = analyze(portfolio_id, as_of)
+    if base.get("empty") or not changes:
+        return base
+
+    weights = dict(base["weights"])
+    for ticker, target in changes.items():
+        if ticker in weights:
+            weights[ticker] = max(0.0, float(target))
+
+    # Where does the freed money go? Spreading it proportionally across the
+    # remaining holdings sounds fair, but it quietly pushes the next-biggest
+    # position past the same limit the person just enforced. So we spread it
+    # only up to that limit, and whatever will not fit sits in cash.
+    limit = float(preference_model.get(portfolio_id).get("concentration_limit_pct", 100))
     fixed = sum(weights[t] for t in changes if t in weights)
     others = [t for t in weights if t not in changes]
-    pool = sum(before["weights"][t] for t in others) or 1.0
-    for t in others:
-        weights[t] = before["weights"][t] / pool * max(0.0, 100 - fixed)
-    return {"before": before, "after_weights": weights}
+    room = max(0.0, 100 - fixed)
+    pool = sum(base["weights"][t] for t in others)
+
+    if pool > 0 and others:
+        for t in others:
+            weights[t] = base["weights"][t] / pool * room
+        # push anything over the limit back out, repeatedly, until the
+        # remaining holdings can absorb no more
+        for _ in range(10):
+            excess = sum(max(0.0, weights[t] - limit) for t in others)
+            if excess < 1e-6:
+                break
+            for t in others:
+                weights[t] = min(weights[t], limit)
+            takers = [t for t in others if weights[t] < limit - 1e-6]
+            if not takers:
+                break
+            headroom = sum(limit - weights[t] for t in takers)
+            give = min(excess, headroom)
+            for t in takers:
+                weights[t] += (limit - weights[t]) / headroom * give
+
+    invested = sum(weights.values())
+    cash_pct = max(0.0, 100 - invested)
+
+    tickers = list(weights)
+    wide = price_model.with_market(tickers, as_of, lookback_days=int(TRADING_DAYS * 1.8))
+    have = [t for t in tickers if t in wide.columns]
+    rets = np.log(wide / wide.shift(1)).dropna(how="all").tail(TRADING_DAYS)
+    stock_rets = rets[have].dropna()
+    cov = _shrunk_cov(stock_rets)
+
+    # Cash has no variance and no beta, so it does not join the covariance
+    # maths: the stock weights simply sum to less than 1 and every risk
+    # figure scales down accordingly, which is exactly what holding cash
+    # does to a portfolio.
+    w = np.array([weights[t] for t in have], dtype=float) / 100.0
+    var = float(w @ cov.to_numpy() @ w)
+    vol = float(np.sqrt(max(var, 0)))
+    mrc = cov.to_numpy() @ w
+    risk_share = (w * mrc / var) if var else np.zeros_like(w)
+
+    # beta of the reweighted mix, from each stock's beta to the market
+    market = np.log(wide[cfg.MARKET_TICKER] / wide[cfg.MARKET_TICKER].shift(1)).dropna()
+    betas = []
+    for t in have:
+        joined = pd.concat([stock_rets[t], market], axis=1, join="inner").dropna()
+        betas.append(float(np.cov(joined.iloc[:, 0], joined.iloc[:, 1])[0, 1] / joined.iloc[:, 1].var())
+                     if len(joined) > 20 else 1.0)
+    beta = float(np.dot(w, betas))
+
+    return {
+        **base,
+        "weights": {t: float(w[i]) * 100 for i, t in enumerate(have)},
+        "risk_share": {t: float(risk_share[i]) * 100 for i, t in enumerate(have)},
+        "volatility_pct": vol * 100,
+        "beta": beta,
+        "cash_pct": round(cash_pct, 1),
+    }

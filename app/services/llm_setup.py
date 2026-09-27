@@ -164,8 +164,9 @@ def status() -> dict:
     elif binary_present():
         message = "Ollama is installed but not running."
     else:
-        message = ("Ollama is not installed. Alerts still work; they are written "
-                   "from templates instead of by the model.")
+        message = ("Ollama is not installed, so nothing is written up. Alerts "
+                   "and every number still work; only the plain-English "
+                   "explanations are missing.")
 
     return {
         "ready": ready,
@@ -179,7 +180,8 @@ def status() -> dict:
         "error": progress["error"],
         "message": message,
         # alerts never block on this: templates are the fallback
-        "fallback": "templates",
+        # nothing writes prose except the model: no templates, no imitations
+        "fallback": "facts only",
     }
 
 

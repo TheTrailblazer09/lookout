@@ -44,7 +44,13 @@ class Config:
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
     LLM_FAST = os.getenv("LLM_FAST", "qwen3.5:9b")     # per-alert text
     LLM_DEEP = os.getenv("LLM_DEEP", "qwen3.8:27b")    # daily summary
-    LLM_TIMEOUT = 25
+    # Per model call. The first call after a model is pulled also loads it
+    # into memory, which is the slow one; later calls are quick.
+    LLM_TIMEOUT = 20
+    # Alerts are generated inside a web request, so the whole narration
+    # step gets a ceiling. Anything past it is written on the next load
+    # rather than holding the page open.
+    NARRATION_BUDGET_SECONDS = 45
     FINBERT_MODEL = "ProsusAI/finbert"
 
     # --- data sources ----------------------------------------------------

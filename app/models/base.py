@@ -10,6 +10,7 @@ future, which is the one mistake that would invalidate the whole demo.
 from __future__ import annotations
 
 import threading
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -19,7 +20,10 @@ import pandas as pd
 from config import get_config
 
 _cfg = get_config()
-_lock = threading.Lock()
+# Reentrant on purpose: a write acquires the lock and may then be the
+# first caller to open the connection, which takes the lock again. A plain
+# Lock deadlocks there, and the symptom is a request that simply hangs.
+_lock = threading.RLock()
 _SCHEMA = Path(__file__).with_name("schema.sql")
 
 # Tables carrying a known_at column: only these may be wrapped by visible().
@@ -31,6 +35,30 @@ FACT_TABLES = {
 
 
 _conn: duckdb.DuckDBPyConnection | None = None
+CONNECT_RETRY_SECONDS = 6
+
+
+def _open_with_retry() -> duckdb.DuckDBPyConnection:
+    """Open the database, waiting briefly if someone else still holds it.
+
+    The reloader hands over by starting the new process before the old one
+    has fully exited, so for a second or two both want the file. Without a
+    retry every code change kills the server. A genuine conflict (a CLI job
+    running in another terminal) still fails, but with an explanation.
+    """
+    deadline = time.monotonic() + CONNECT_RETRY_SECONDS
+    last: Exception | None = None
+    while time.monotonic() < deadline:
+        try:
+            return duckdb.connect(str(_cfg.DB_PATH))
+        except duckdb.IOException as exc:
+            last = exc
+            time.sleep(0.25)
+    raise RuntimeError(
+        f"Another process is using {_cfg.DB_PATH}. DuckDB allows one writer at a "
+        "time: stop the server before running `flask ingest`, `flask build` or "
+        "`flask train`, and vice versa."
+    ) from last
 
 
 def _root() -> duckdb.DuckDBPyConnection:
@@ -48,14 +76,19 @@ def _root() -> duckdb.DuckDBPyConnection:
         with _lock:
             if _conn is None:
                 _cfg.DATA_DIR.mkdir(parents=True, exist_ok=True)
-                _conn = duckdb.connect(str(_cfg.DB_PATH))
+                con = _open_with_retry()
+                # schema lives here so it is created exactly once, by
+                # whichever process opens the file first
+                con.execute(_SCHEMA.read_text())
+                _conn = con
     return _conn
 
 
 def init_db() -> None:
-    """Create the file and every table. Safe to run repeatedly."""
-    with connect() as con:
-        con.execute(_SCHEMA.read_text())
+    """Kept for callers that want the tables to exist right now. The
+    connection creates them on first use anyway, so this is just an
+    explicit nudge."""
+    _root()
 
 
 @contextmanager

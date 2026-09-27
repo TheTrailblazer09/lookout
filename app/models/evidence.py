@@ -23,7 +23,8 @@ def usable(as_of: str, ticker: str | None = None,
            event_type: str | None = None) -> pd.DataFrame:
     """Rows whose outcome window had closed by as_of. An event that happened
     but whose 5 days have not finished is not evidence yet."""
-    where = [f"outcome_known_at <= TIMESTAMP '{as_of} 23:59:59'", "included"]
+    day = str(as_of)[:10]          # tolerate a timestamp being passed in
+    where = [f"outcome_known_at <= TIMESTAMP '{day} 23:59:59'", "included"]
     if ticker:
         where.append(f"ticker = '{ticker.upper()}'")
     if event_type:
